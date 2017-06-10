@@ -7,14 +7,14 @@ import org.apache.maven.project.MavenProject;
 
 /**
  * @author VISTALL
- * @since 28-May-17
+ * @since 10-Jun-17
  */
-@Mojo(name = "instrument", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresOnline = false, requiresDependencyResolution = ResolutionScope.COMPILE)
-public class InstrumentMojo extends AbstractInstrumentMojo
+@Mojo(name = "test-instrument", defaultPhase = LifecyclePhase.PROCESS_TEST_CLASSES, requiresOnline = false, requiresDependencyResolution = ResolutionScope.TEST)
+public class TestInstrumentMojo extends AbstractInstrumentMojo
 {
 	@Override
 	protected String getTargetDirectory(MavenProject project)
 	{
-		return project.getBuild().getOutputDirectory();
+		return project.getBuild().getTestOutputDirectory();
 	}
 }

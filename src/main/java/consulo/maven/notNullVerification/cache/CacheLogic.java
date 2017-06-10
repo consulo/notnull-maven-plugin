@@ -16,7 +16,7 @@ import org.codehaus.plexus.util.IOUtil;
  */
 public class CacheLogic
 {
-	public static final String NAME = "notnull.cache";
+	public static final String NAME = "not-null.cache";
 
 	private File myFile;
 
@@ -123,6 +123,6 @@ public class CacheLogic
 
 	public void putCacheEntry(File clasFile)
 	{
-		myCacheEntries.add(new CacheEntry( clasFile, clasFile.lastModified()));
+		myCacheEntries.add(new CacheEntry(clasFile, clasFile.lastModified()));
 	}
 }
