@@ -13,9 +13,10 @@
 	<repositories>
 		<repository>
 			<id>consulo</id>
-			<url>https://nexus.consulo.io/repository/consulo/</url>
+			<url>https://maven.consulo.io/repository/snapshots/</url>
 			<snapshots>
-				<enabled>false</enabled>
+				<enabled>true</enabled>
+				<updatePolicy>always</updatePolicy>
 			</snapshots>
 		</repository>
 	</repositories>

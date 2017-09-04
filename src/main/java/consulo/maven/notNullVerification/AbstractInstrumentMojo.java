@@ -40,6 +40,8 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 	protected abstract String getTargetDirectory(MavenProject project);
 
+	protected abstract String getCacheFileName();
+
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException
 	{
@@ -62,7 +64,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 			InstrumentationClassFinder finder = buildFinder();
 
-			CacheLogic cacheLogic = new CacheLogic(myMavenProject, CacheLogic.NAME);
+			CacheLogic cacheLogic = new CacheLogic(myMavenProject, getCacheFileName());
 
 			cacheLogic.read();
 
@@ -76,7 +78,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 				cacheLogic.removeCacheEntry(classFile);
 
-				byte[] data = null;
+				byte[] data;
 				FileInputStream stream = null;
 				try
 				{
@@ -93,28 +95,35 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 					IOUtil.close(stream);
 				}
 
-				FailSafeClassReader reader = new FailSafeClassReader(data, 0, data.length);
-
-				ClassWriter writer = new InstrumenterClassWriter(reader, isJdk6() ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS, finder);
-
-				NotNullVerifyingInstrumenter.processClassFile(reader, writer);
-
-				changed = true;
-
-				FileOutputStream outputStream = null;
 				try
 				{
-					outputStream = new FileOutputStream(classFile);
-					outputStream.write(writer.toByteArray());
+					FailSafeClassReader reader = new FailSafeClassReader(data, 0, data.length);
+
+					ClassWriter writer = new InstrumenterClassWriter(reader, isJdk6() ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS, finder);
+
+					NotNullVerifyingInstrumenter.processClassFile(reader, writer);
+
+					changed = true;
+
+					FileOutputStream outputStream = null;
+					try
+					{
+						outputStream = new FileOutputStream(classFile);
+						outputStream.write(writer.toByteArray());
+					}
+					finally
+					{
+						IOUtil.close(outputStream);
+					}
+
+					getLog().debug("Processed: " + classFile.getPath());
+
+					cacheLogic.putCacheEntry(new File(classFile.getPath()));
 				}
-				finally
+				catch(Exception e)
 				{
-					IOUtil.close(outputStream);
+					getLog().error("Fail to instrument " + classFile.getPath(), e);
 				}
-
-				getLog().info("Processed: " + classFile.getPath());
-
-				cacheLogic.putCacheEntry(new File(classFile.getPath()));
 			}
 
 			if(!changed)
