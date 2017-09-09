@@ -40,6 +40,8 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 	protected abstract String getTargetDirectory(MavenProject project);
 
+	protected abstract List<String> getClasspathElements(MavenProject project) throws DependencyResolutionRequiredException;
+
 	protected abstract String getCacheFileName();
 
 	@Override
@@ -155,8 +157,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 			classpath.add(rtJar.toURI().toURL());
 		}
 
-		List<String> compileClasspathElements = myMavenProject.getCompileClasspathElements();
-		for(String compileClasspathElement : compileClasspathElements)
+		for(String compileClasspathElement : getClasspathElements(myMavenProject))
 		{
 			classpath.add(new File(compileClasspathElement).toURI().toURL());
 		}

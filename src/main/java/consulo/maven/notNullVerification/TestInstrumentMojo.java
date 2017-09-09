@@ -1,5 +1,8 @@
 package consulo.maven.notNullVerification;
 
+import java.util.List;
+
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
@@ -17,6 +20,12 @@ public class TestInstrumentMojo extends AbstractInstrumentMojo
 	protected String getTargetDirectory(MavenProject project)
 	{
 		return project.getBuild().getTestOutputDirectory();
+	}
+
+	@Override
+	protected List<String> getClasspathElements(MavenProject project) throws DependencyResolutionRequiredException
+	{
+		return project.getTestClasspathElements();
 	}
 
 	@Override
