@@ -161,7 +161,13 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 			classpath.add(new File(compileClasspathElement).toURI().toURL());
 		}
 
-		return new InstrumentationClassFinder(classpath.toArray(new URL[classpath.size()]));
+		boolean jdk9 = isJdk9();
+		URL[] platformUrls = new URL[jdk9 ? 1 : 0];
+		if(jdk9)
+		{
+			platformUrls[0] = InstrumentationClassFinder.createJDKPlatformUrl(javaHome.getPath());
+		}
+		return new InstrumentationClassFinder(platformUrls, classpath.toArray(new URL[classpath.size()]));
 	}
 
 	private boolean isJdk6()
@@ -172,6 +178,14 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 	private boolean isJdk9()
 	{
+		try
+		{
+			int version = Integer.parseInt(System.getProperty("java.version"));
+			return version >= 9;
+		}
+		catch(Exception ignored)
+		{
+		}
 		return false;
 	}
 
