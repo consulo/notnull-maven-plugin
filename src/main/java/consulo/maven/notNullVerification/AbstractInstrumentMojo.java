@@ -64,7 +64,10 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 				return;
 			}
 
-			getLog().info("Target: " + System.getProperty("java.version"));
+			if(isJdk9())
+			{
+				getLog().info("Target: jdk9");
+			}
 
 			InstrumentationClassFinder finder = buildFinder();
 
