@@ -64,7 +64,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 				return;
 			}
 
-			if(isJdk9())
+			if(isJdk9OrHighter())
 			{
 				getLog().info("Target: jdk9");
 			}
@@ -167,7 +167,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 			classpath.add(new File(compileClasspathElement).toURI().toURL());
 		}
 
-		boolean jdk9 = isJdk9();
+		boolean jdk9 = isJdk9OrHighter();
 		URL[] platformUrls = new URL[jdk9 ? 1 : 0];
 		if(jdk9)
 		{
@@ -182,17 +182,17 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 		return true;
 	}
 
-	private boolean isJdk9()
+	private boolean isJdk9OrHighter()
 	{
 		try
 		{
-			int version = Integer.parseInt(System.getProperty("java.version"));
-			return version >= 9;
+			Class.forName("java.lang.Module");
+			return true;
 		}
-		catch(Exception ignored)
+		catch(ClassNotFoundException e)
 		{
+			return false;
 		}
-		return false;
 	}
 
 	protected File getClassFile(String className)
@@ -222,7 +222,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 	private void addParentClasspath(Collection<URL> classpath, boolean ext) throws MalformedURLException
 	{
-		boolean isJava9 = isJdk9();
+		boolean isJava9 = isJdk9OrHighter();
 		if(!isJava9)
 		{
 			String[] extDirs = System.getProperty("java.ext.dirs", "").split(File.pathSeparator);
