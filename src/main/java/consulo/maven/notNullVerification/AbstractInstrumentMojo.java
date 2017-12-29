@@ -129,7 +129,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 				}
 				catch(Exception e)
 				{
-					getLog().error("Fail to instrument " + classFile.getPath(), e);
+					getLog().warn("Fail to instrument " + classFile.getPath(), e);
 				}
 			}
 
