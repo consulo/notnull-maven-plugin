@@ -35,6 +35,12 @@ import consulo.maven.notNullVerification.cache.CacheLogic;
  */
 public abstract class AbstractInstrumentMojo extends AbstractMojo
 {
+	private static final String[] ourNonNullAnnotations = {
+			"javax.annotation.Nonnull",
+			// deprecated variant - remove after full migration to nonnull
+			"org.jetbrains.annotations.NotNull"
+	};
+
 	@Parameter(property = "project", defaultValue = "${project}")
 	private MavenProject myMavenProject;
 
@@ -108,7 +114,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 
 					ClassWriter writer = new InstrumenterClassWriter(reader, isJdk6() ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS, finder);
 
-					NotNullVerifyingInstrumenter.processClassFile(reader, writer);
+					NotNullVerifyingInstrumenter.processClassFile(reader, writer, ourNonNullAnnotations);
 
 					changed = true;
 
