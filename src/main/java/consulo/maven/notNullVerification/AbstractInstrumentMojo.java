@@ -1,19 +1,12 @@
 package consulo.maven.notNullVerification;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.lang.management.ManagementFactory;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.StringTokenizer;
-
+import com.intellij.compiler.instrumentation.FailSafeClassReader;
+import com.intellij.compiler.instrumentation.InstrumentationClassFinder;
+import com.intellij.compiler.instrumentation.InstrumenterClassWriter;
+import com.intellij.compiler.notNullVerification.NotNullVerifyingInstrumenter;
+import consulo.internal.org.objectweb.asm.ClassReader;
+import consulo.internal.org.objectweb.asm.ClassWriter;
+import consulo.maven.notNullVerification.cache.CacheLogic;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -22,12 +15,14 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.IOUtil;
-import consulo.internal.org.objectweb.asm.ClassWriter;
-import com.intellij.compiler.instrumentation.FailSafeClassReader;
-import com.intellij.compiler.instrumentation.InstrumentationClassFinder;
-import com.intellij.compiler.instrumentation.InstrumenterClassWriter;
-import com.intellij.compiler.notNullVerification.NotNullVerifyingInstrumenter;
-import consulo.maven.notNullVerification.cache.CacheLogic;
+
+import java.io.*;
+import java.lang.management.ManagementFactory;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.*;
 
 /**
  * @author VISTALL
@@ -108,11 +103,22 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 					IOUtil.close(stream);
 				}
 
+				int version;
+				InputStream tempStream = new ByteArrayInputStream(data);
+				try
+				{
+					version = InstrumenterClassWriter.getClassFileVersion(new ClassReader(tempStream));
+				}
+				finally
+				{
+					tempStream.close();
+				}
+
 				try
 				{
 					FailSafeClassReader reader = new FailSafeClassReader(data, 0, data.length);
 
-					ClassWriter writer = new InstrumenterClassWriter(reader, isJdk6() ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS, finder);
+					ClassWriter writer = new InstrumenterClassWriter(reader, InstrumenterClassWriter.getAsmClassWriterFlags(version), finder);
 
 					NotNullVerifyingInstrumenter.processClassFile(reader, writer, ourNonNullAnnotations);
 
@@ -180,12 +186,6 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo
 			platformUrls[0] = InstrumentationClassFinder.createJDKPlatformUrl(javaHome.getPath());
 		}
 		return new InstrumentationClassFinder(platformUrls, classpath.toArray(new URL[classpath.size()]));
-	}
-
-	private boolean isJdk6()
-	{
-		// FIXME [VISTALL] we need this?
-		return true;
 	}
 
 	private boolean isJdk9OrHighter()
