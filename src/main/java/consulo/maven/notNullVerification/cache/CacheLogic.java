@@ -1,14 +1,10 @@
 package consulo.maven.notNullVerification.cache;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.util.HashSet;
-
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.IOUtil;
+import org.apache.maven.shared.utils.io.IOUtil;
+
+import java.io.*;
+import java.util.HashSet;
 
 /**
  * @author VISTALL
