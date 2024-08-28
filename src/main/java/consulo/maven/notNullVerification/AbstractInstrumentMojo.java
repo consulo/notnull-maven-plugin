@@ -31,6 +31,7 @@ import java.util.*;
 public abstract class AbstractInstrumentMojo extends AbstractMojo {
     private static final String[] ourNonNullAnnotations = {
         "javax.annotation.Nonnull",
+        "jakarta.annotation.Nonnull",
         // deprecated variant - remove after full migration to nonnull
         "org.jetbrains.annotations.NotNull"
     };
@@ -50,6 +51,11 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
+            if (skip) {
+                getLog().info("skiped");
+                return;
+            }
+
             String outputDirectory = getTargetDirectory(myMavenProject);
             File directory = new File(outputDirectory);
             if (!directory.exists()) {
