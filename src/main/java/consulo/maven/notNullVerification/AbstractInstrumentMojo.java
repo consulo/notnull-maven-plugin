@@ -28,287 +28,234 @@ import java.util.*;
  * @author VISTALL
  * @since 10-Jun-17
  */
-public abstract class AbstractInstrumentMojo extends AbstractMojo
-{
-	private static final String[] ourNonNullAnnotations = {
-			"javax.annotation.Nonnull",
-			// deprecated variant - remove after full migration to nonnull
-			"org.jetbrains.annotations.NotNull"
-	};
+public abstract class AbstractInstrumentMojo extends AbstractMojo {
+    private static final String[] ourNonNullAnnotations = {
+        "javax.annotation.Nonnull",
+        // deprecated variant - remove after full migration to nonnull
+        "org.jetbrains.annotations.NotNull"
+    };
 
-	@Parameter(property = "project", defaultValue = "${project}")
-	private MavenProject myMavenProject;
+    @Parameter(property = "project", defaultValue = "${project}")
+    private MavenProject myMavenProject;
 
-	protected abstract String getTargetDirectory(MavenProject project);
+    @Parameter(property = "skip", defaultValue = "false")
+    private boolean skip = false;
 
-	protected abstract List<String> getClasspathElements(MavenProject project) throws DependencyResolutionRequiredException;
+    protected abstract String getTargetDirectory(MavenProject project);
 
-	protected abstract String getCacheFileName();
+    protected abstract List<String> getClasspathElements(MavenProject project) throws DependencyResolutionRequiredException;
 
-	@Override
-	public void execute() throws MojoExecutionException, MojoFailureException
-	{
-		try
-		{
-			String outputDirectory = getTargetDirectory(myMavenProject);
-			File directory = new File(outputDirectory);
-			if(!directory.exists())
-			{
-				getLog().info(outputDirectory + " is not exists");
-				return;
-			}
+    protected abstract String getCacheFileName();
 
-			getLog().info(outputDirectory);
-			List<File> files = FileUtils.getFiles(directory, "**/*.class", null);
-			if(files.isEmpty())
-			{
-				return;
-			}
+    @Override
+    public void execute() throws MojoExecutionException, MojoFailureException {
+        try {
+            String outputDirectory = getTargetDirectory(myMavenProject);
+            File directory = new File(outputDirectory);
+            if (!directory.exists()) {
+                getLog().info(outputDirectory + " is not exists");
+                return;
+            }
 
-			if(isJdk9OrHighter())
-			{
-				getLog().info("Target: jdk9");
-			}
+            getLog().info(outputDirectory);
+            List<File> files = FileUtils.getFiles(directory, "**/*.class", null);
+            if (files.isEmpty()) {
+                return;
+            }
 
-			InstrumentationClassFinder finder = buildFinder();
+            if (isJdk9OrHighter()) {
+                getLog().info("Target: jdk9");
+            }
 
-			CacheLogic cacheLogic = new CacheLogic(myMavenProject, getCacheFileName());
+            InstrumentationClassFinder finder = buildFinder();
 
-			cacheLogic.read();
+            CacheLogic cacheLogic = new CacheLogic(myMavenProject, getCacheFileName());
 
-			boolean changed = false;
-			for(File classFile : files)
-			{
-				if(cacheLogic.isUpToDate(classFile))
-				{
-					continue;
-				}
+            cacheLogic.read();
 
-				cacheLogic.removeCacheEntry(classFile);
+            boolean changed = false;
+            for (File classFile : files) {
+                if (cacheLogic.isUpToDate(classFile)) {
+                    continue;
+                }
 
-				byte[] data;
-				FileInputStream stream = null;
-				try
-				{
-					stream = new FileInputStream(classFile);
-					data = IOUtil.toByteArray(stream);
-				}
-				catch(Exception e)
-				{
-					getLog().error(e);
-					continue;
-				}
-				finally
-				{
-					IOUtil.close(stream);
-				}
+                cacheLogic.removeCacheEntry(classFile);
 
-				int version;
-				InputStream tempStream = new ByteArrayInputStream(data);
-				try
-				{
-					version = InstrumenterClassWriter.getClassFileVersion(new ClassReader(tempStream));
-				}
-				finally
-				{
-					tempStream.close();
-				}
+                byte[] data;
+                FileInputStream stream = null;
+                try {
+                    stream = new FileInputStream(classFile);
+                    data = IOUtil.toByteArray(stream);
+                }
+                catch (Exception e) {
+                    getLog().error(e);
+                    continue;
+                }
+                finally {
+                    IOUtil.close(stream);
+                }
 
-				try
-				{
-					FailSafeClassReader reader = new FailSafeClassReader(data, 0, data.length);
+                int version;
+                try (InputStream tempStream = new ByteArrayInputStream(data)) {
+                    version = InstrumenterClassWriter.getClassFileVersion(new ClassReader(tempStream));
+                }
 
-					ClassWriter writer = new InstrumenterClassWriter(reader, InstrumenterClassWriter.getAsmClassWriterFlags(version), finder);
+                try {
+                    FailSafeClassReader reader = new FailSafeClassReader(data, 0, data.length);
 
-					NotNullVerifyingInstrumenter.processClassFile(reader, writer, ourNonNullAnnotations);
+                    ClassWriter writer = new InstrumenterClassWriter(reader, InstrumenterClassWriter.getAsmClassWriterFlags(version), finder);
 
-					changed = true;
+                    NotNullVerifyingInstrumenter.processClassFile(reader, writer, ourNonNullAnnotations);
 
-					FileOutputStream outputStream = null;
-					try
-					{
-						outputStream = new FileOutputStream(classFile);
-						outputStream.write(writer.toByteArray());
-					}
-					finally
-					{
-						IOUtil.close(outputStream);
-					}
+                    changed = true;
 
-					getLog().debug("Processed: " + classFile.getPath());
+                    FileOutputStream outputStream = null;
+                    try {
+                        outputStream = new FileOutputStream(classFile);
+                        outputStream.write(writer.toByteArray());
+                    }
+                    finally {
+                        IOUtil.close(outputStream);
+                    }
 
-					cacheLogic.putCacheEntry(new File(classFile.getPath()));
-				}
-				catch(Exception e)
-				{
-					getLog().warn("Fail to instrument " + classFile.getPath(), e);
-				}
-			}
+                    getLog().debug("Processed: " + classFile.getPath());
 
-			if(!changed)
-			{
-				getLog().info("Nothing to instrument - all classes are up to date");
-			}
-			else
-			{
-				cacheLogic.write();
-			}
-		}
-		catch(Exception e)
-		{
-			getLog().error(e);
-		}
-	}
+                    cacheLogic.putCacheEntry(new File(classFile.getPath()));
+                }
+                catch (Exception e) {
+                    getLog().warn("Fail to instrument " + classFile.getPath(), e);
+                }
+            }
 
-	private InstrumentationClassFinder buildFinder() throws MalformedURLException, DependencyResolutionRequiredException
-	{
-		Collection<URL> classpath = new LinkedHashSet<URL>();
-		addParentClasspath(classpath, false);
-		addParentClasspath(classpath, true);
+            if (!changed) {
+                getLog().info("Nothing to instrument - all classes are up to date");
+            }
+            else {
+                cacheLogic.write();
+            }
+        }
+        catch (Exception e) {
+            getLog().error(e);
+        }
+    }
 
-		File javaHome = new File(System.getProperty("java.home"));
+    private InstrumentationClassFinder buildFinder() throws MalformedURLException, DependencyResolutionRequiredException {
+        Collection<URL> classpath = new LinkedHashSet<URL>();
+        addParentClasspath(classpath, false);
+        addParentClasspath(classpath, true);
 
-		File rtJar = new File(javaHome, "lib/rt.jar");
-		if(rtJar.exists())
-		{
-			classpath.add(rtJar.toURI().toURL());
-		}
+        File javaHome = new File(System.getProperty("java.home"));
 
-		for(String compileClasspathElement : getClasspathElements(myMavenProject))
-		{
-			classpath.add(new File(compileClasspathElement).toURI().toURL());
-		}
+        File rtJar = new File(javaHome, "lib/rt.jar");
+        if (rtJar.exists()) {
+            classpath.add(rtJar.toURI().toURL());
+        }
 
-		boolean jdk9 = isJdk9OrHighter();
-		URL[] platformUrls = new URL[jdk9 ? 1 : 0];
-		if(jdk9)
-		{
-			platformUrls[0] = InstrumentationClassFinder.createJDKPlatformUrl(javaHome.getPath());
-		}
-		return new InstrumentationClassFinder(platformUrls, classpath.toArray(new URL[classpath.size()]));
-	}
+        for (String compileClasspathElement : getClasspathElements(myMavenProject)) {
+            classpath.add(new File(compileClasspathElement).toURI().toURL());
+        }
 
-	private boolean isJdk9OrHighter()
-	{
-		try
-		{
-			Class.forName("java.lang.Module");
-			return true;
-		}
-		catch(ClassNotFoundException e)
-		{
-			return false;
-		}
-	}
+        boolean jdk9 = isJdk9OrHighter();
+        URL[] platformUrls = new URL[jdk9 ? 1 : 0];
+        if (jdk9) {
+            platformUrls[0] = InstrumentationClassFinder.createJDKPlatformUrl(javaHome.getPath());
+        }
+        return new InstrumentationClassFinder(platformUrls, classpath.toArray(new URL[classpath.size()]));
+    }
 
-	protected File getClassFile(String className)
-	{
-		final String classOrInnerName = getClassOrInnerName(className);
-		if(classOrInnerName == null)
-		{
-			return null;
-		}
-		return new File(myMavenProject.getBuild().getOutputDirectory(), classOrInnerName + ".class");
-	}
+    private boolean isJdk9OrHighter() {
+        try {
+            Class.forName("java.lang.Module");
+            return true;
+        }
+        catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 
-	protected String getClassOrInnerName(String className)
-	{
-		File classFile = new File(myMavenProject.getBuild().getOutputDirectory(), className + ".class");
-		if(classFile.exists())
-		{
-			return className;
-		}
-		int position = className.lastIndexOf('/');
-		if(position == -1)
-		{
-			return null;
-		}
-		return getClassOrInnerName(className.substring(0, position) + '$' + className.substring(position + 1));
-	}
+    protected File getClassFile(String className) {
+        final String classOrInnerName = getClassOrInnerName(className);
+        if (classOrInnerName == null) {
+            return null;
+        }
+        return new File(myMavenProject.getBuild().getOutputDirectory(), classOrInnerName + ".class");
+    }
 
-	private void addParentClasspath(Collection<URL> classpath, boolean ext) throws MalformedURLException
-	{
-		boolean isJava9 = isJdk9OrHighter();
-		if(!isJava9)
-		{
-			String[] extDirs = System.getProperty("java.ext.dirs", "").split(File.pathSeparator);
-			if(ext && extDirs.length == 0)
-			{
-				return;
-			}
+    protected String getClassOrInnerName(String className) {
+        File classFile = new File(myMavenProject.getBuild().getOutputDirectory(), className + ".class");
+        if (classFile.exists()) {
+            return className;
+        }
+        int position = className.lastIndexOf('/');
+        if (position == -1) {
+            return null;
+        }
+        return getClassOrInnerName(className.substring(0, position) + '$' + className.substring(position + 1));
+    }
 
-			List<URLClassLoader> loaders = new ArrayList<URLClassLoader>(2);
-			for(ClassLoader loader = InstrumentMojo.class.getClassLoader(); loader != null; loader = loader.getParent())
-			{
-				if(loader instanceof URLClassLoader)
-				{
-					loaders.add(0, (URLClassLoader) loader);
-				}
-				else
-				{
-					getLog().warn("Unknown class loader: " + loader.getClass().getName());
-				}
-			}
+    private void addParentClasspath(Collection<URL> classpath, boolean ext) throws MalformedURLException {
+        boolean isJava9 = isJdk9OrHighter();
+        if (!isJava9) {
+            String[] extDirs = System.getProperty("java.ext.dirs", "").split(File.pathSeparator);
+            if (ext && extDirs.length == 0) {
+                return;
+            }
 
-			for(URLClassLoader loader : loaders)
-			{
-				URL[] urls = loader.getURLs();
-				for(URL url : urls)
-				{
-					String path = urlToPath(url);
+            List<URLClassLoader> loaders = new ArrayList<URLClassLoader>(2);
+            for (ClassLoader loader = InstrumentMojo.class.getClassLoader(); loader != null; loader = loader.getParent()) {
+                if (loader instanceof URLClassLoader) {
+                    loaders.add(0, (URLClassLoader) loader);
+                }
+                else {
+                    getLog().warn("Unknown class loader: " + loader.getClass().getName());
+                }
+            }
 
-					boolean isExt = false;
-					for(String extDir : extDirs)
-					{
-						if(path.startsWith(extDir) && path.length() > extDir.length() && path.charAt(extDir.length()) == File.separatorChar)
-						{
-							isExt = true;
-							break;
-						}
-					}
+            for (URLClassLoader loader : loaders) {
+                URL[] urls = loader.getURLs();
+                for (URL url : urls) {
+                    String path = urlToPath(url);
 
-					if(isExt == ext)
-					{
-						classpath.add(url);
-					}
-				}
-			}
-		}
-		else if(!ext)
-		{
-			parseClassPathString(ManagementFactory.getRuntimeMXBean().getClassPath(), classpath);
-		}
-	}
+                    boolean isExt = false;
+                    for (String extDir : extDirs) {
+                        if (path.startsWith(extDir) && path.length() > extDir.length() && path.charAt(extDir.length()) == File.separatorChar) {
+                            isExt = true;
+                            break;
+                        }
+                    }
 
-	private void parseClassPathString(String pathString, Collection<URL> classpath)
-	{
-		if(pathString != null && !pathString.isEmpty())
-		{
-			try
-			{
-				StringTokenizer tokenizer = new StringTokenizer(pathString, File.pathSeparator + ',', false);
-				while(tokenizer.hasMoreTokens())
-				{
-					String pathItem = tokenizer.nextToken();
-					classpath.add(new File(pathItem).toURI().toURL());
-				}
-			}
-			catch(MalformedURLException e)
-			{
-				getLog().error(e);
-			}
-		}
-	}
+                    if (isExt == ext) {
+                        classpath.add(url);
+                    }
+                }
+            }
+        }
+        else if (!ext) {
+            parseClassPathString(ManagementFactory.getRuntimeMXBean().getClassPath(), classpath);
+        }
+    }
 
-	private static String urlToPath(URL url) throws MalformedURLException
-	{
-		try
-		{
-			return new File(url.toURI().getSchemeSpecificPart()).getPath();
-		}
-		catch(URISyntaxException e)
-		{
-			throw new MalformedURLException(url.toString());
-		}
-	}
+    private void parseClassPathString(String pathString, Collection<URL> classpath) {
+        if (pathString != null && !pathString.isEmpty()) {
+            try {
+                StringTokenizer tokenizer = new StringTokenizer(pathString, File.pathSeparator + ',', false);
+                while (tokenizer.hasMoreTokens()) {
+                    String pathItem = tokenizer.nextToken();
+                    classpath.add(new File(pathItem).toURI().toURL());
+                }
+            }
+            catch (MalformedURLException e) {
+                getLog().error(e);
+            }
+        }
+    }
+
+    private static String urlToPath(URL url) throws MalformedURLException {
+        try {
+            return new File(url.toURI().getSchemeSpecificPart()).getPath();
+        }
+        catch (URISyntaxException e) {
+            throw new MalformedURLException(url.toString());
+        }
+    }
 }
